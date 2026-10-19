@@ -1,32 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Zap, BatteryCharging, DollarSign, Home, MapPin, Plus, 
-  Trash2, Edit2, Camera, User, LogOut, LogIn, TrendingUp, ShieldCheck 
+  Trash2, Edit2, Camera, User, LogOut, LogIn, TrendingUp, ShieldCheck, Car, Settings 
 } from 'lucide-react';
 
 export default function App() {
-  // Giriş ve Profil State'leri
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [authForm, setAuthForm] = useState({ email: '', password: '', name: '', plate: '' });
   const [activeTab, setActiveTab] = useState('dashboard');
   
-  // Kullanıcı Profili ve Araç Bilgileri
+  // Profil ve Araç Listesi
   const [profile, setProfile] = useState({
     name: 'Mert Sağlam',
     email: 'mert@example.com',
-    carBrand: 'Tesla Model Y',
-    plate: '34 EV 2026',
+    cars: [
+      { id: 1, brand: 'Tesla Model Y', plate: '34 EV 2026', active: true },
+      { id: 2, brand: 'TOGG T10X', plate: '06 TRG 2026', active: false }
+    ],
     apiKey: ''
   });
 
-  // Şarj Kayıtları State'i
+  const [newCarBrand, setNewCarBrand] = useState('');
+  const [newCarPlate, setNewCarPlate] = useState('');
+
+  // Şarj Kayıtları
   const [logs, setLogs] = useState([
     { id: 1, date: '2026-06-01', type: 'Ev', station: 'Ev Tipi Şarj', kwh: 45, cost: 120, batteryBefore: 20, batteryAfter: 90 },
     { id: 2, date: '2026-06-03', type: 'DC', station: 'ZES Şarj İstasyonu', kwh: 60, cost: 450, batteryBefore: 15, batteryAfter: 85 },
     { id: 3, date: '2026-06-05', type: 'AC', station: 'Akel Enerji', kwh: 30, cost: 180, batteryBefore: 30, batteryAfter: 80 }
   ]);
 
-  // Yeni Kayıt / Düzenleme Formu
+  // Form State
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
     type: 'Ev',
@@ -38,34 +42,37 @@ export default function App() {
   });
   const [editingId, setEditingId] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
 
-  // Toplam Metrikler
+  // Aktif Araç
+  const activeCar = profile.cars.find(c => c.active) || profile.cars[0];
+
+  // Metrikler
   const totalKwh = logs.reduce((acc, l) => acc + Number(l.kwh), 0);
   const totalCost = logs.reduce((acc, l) => acc + Number(l.cost), 0);
   const evKwh = logs.filter(l => l.type === 'Ev').reduce((acc, l) => acc + Number(l.kwh), 0);
   const acKwh = logs.filter(l => l.type === 'AC').reduce((acc, l) => acc + Number(l.kwh), 0);
   const dcKwh = logs.filter(l => l.type === 'DC').reduce((acc, l) => acc + Number(l.kwh), 0);
 
-  // İstasyon Bazlı Tüketimler
   const stationTotals = logs.reduce((acc, l) => {
     acc[l.station] = (acc[l.station] || 0) + Number(l.kwh);
     return acc;
   }, {});
 
-  // AI Fotoğraf Simülasyonu / Analizi
+  // AI Fotoğraf Analizi
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
+    setPreviewImage(URL.createObjectURL(file));
     setIsAnalyzing(true);
     setTimeout(() => {
-      // Her seferinde temiz veri okuma simülasyonu
       setForm(prev => ({
         ...prev,
-        kwh: Math.floor(Math.random() * 40) + 20,
-        cost: Math.floor(Math.random() * 300) + 100,
-        batteryBefore: 20,
-        batteryAfter: 90
+        kwh: Math.floor(Math.random() * 45) + 15,
+        cost: Math.floor(Math.random() * 350) + 90,
+        batteryBefore: 18,
+        batteryAfter: 92
       }));
       setIsAnalyzing(false);
     }, 1500);
@@ -91,6 +98,8 @@ export default function App() {
       batteryBefore: '',
       batteryAfter: ''
     });
+    setPreviewImage(null);
+    setActiveTab('logs');
   };
 
   const handleEdit = (log) => {
@@ -103,7 +112,27 @@ export default function App() {
     setLogs(logs.filter(l => l.id !== id));
   };
 
-  // Giriş Yapılmadıysa Giriş Ekranı Göster
+  const handleAddCar = (e) => {
+    e.preventDefault();
+    if (!newCarBrand || !newCarPlate) return;
+    const newCar = {
+      id: Date.now(),
+      brand: newCarBrand,
+      plate: newCarPlate,
+      active: profile.cars.length === 0
+    };
+    setProfile({ ...profile, cars: [...profile.cars, newCar] });
+    setNewCarBrand('');
+    setNewCarPlate('');
+  };
+
+  const setActiveCarFunc = (id) => {
+    setProfile({
+      ...profile,
+      cars: profile.cars.map(c => ({ ...c, active: c.id === id }))
+    });
+  };
+
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
@@ -120,48 +149,27 @@ export default function App() {
             <div>
               <label className="block text-xs font-medium text-slate-400 mb-1">Ad Soyad</label>
               <input 
-                type="text" 
-                required
-                placeholder="Mert Sağlam"
-                value={authForm.name}
-                onChange={e => setAuthForm({...authForm, name: e.target.value})}
+                type="text" required placeholder="Mert Sağlam"
+                value={authForm.name} onChange={e => setAuthForm({...authForm, name: e.target.value})}
                 className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500"
               />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-400 mb-1">E-Posta Adresi</label>
               <input 
-                type="email" 
-                required
-                placeholder="ornek@mail.com"
-                value={authForm.email}
-                onChange={e => setAuthForm({...authForm, email: e.target.value})}
+                type="email" required placeholder="ornek@mail.com"
+                value={authForm.email} onChange={e => setAuthForm({...authForm, email: e.target.value})}
                 className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500"
               />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-400 mb-1">Şifre</label>
               <input 
-                type="password" 
-                required
-                placeholder="••••••••"
-                value={authForm.password}
-                onChange={e => setAuthForm({...authForm, password: e.target.value})}
+                type="password" required placeholder="••••••••"
+                value={authForm.password} onChange={e => setAuthForm({...authForm, password: e.target.value})}
                 className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500"
               />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1">Araç Plakası</label>
-              <input 
-                type="text" 
-                required
-                placeholder="34 EV 2026"
-                value={authForm.plate}
-                onChange={e => setAuthForm({...authForm, plate: e.target.value})}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500"
-              />
-            </div>
-
             <button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3 rounded-xl transition flex items-center justify-center gap-2 mt-2">
               <LogIn className="w-5 h-5" /> Giriş Yap ve Başla
             </button>
@@ -209,7 +217,7 @@ export default function App() {
               onClick={() => setActiveTab('profile')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition ${activeTab === 'profile' ? 'bg-emerald-500 text-slate-950 font-bold' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
             >
-              <User className="w-5 h-5" /> Profil ve Ayarlar
+              <User className="w-5 h-5" /> Profil ve Araçlar
             </button>
           </nav>
         </div>
@@ -224,22 +232,26 @@ export default function App() {
         </div>
       </aside>
 
-      {/* Ana İçerik Alanı */}
+      {/* İçerik */}
       <main className="flex-1 p-6 md:p-10 overflow-y-auto">
-        {/* DASHBOARD */}
         {activeTab === 'dashboard' && (
           <div className="space-y-8">
-            {/* Araç Başlık Kartı */}
+            {/* Araç Başlık */}
             <div className="bg-gradient-to-r from-slate-900 to-slate-800 border border-slate-800 p-6 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-6">
-              <div>
-                <span className="bg-emerald-500/10 text-emerald-400 text-xs px-3 py-1 rounded-full font-semibold border border-emerald-500/20">Aktif Araç</span>
-                <h1 className="text-2xl font-bold text-white mt-2">{profile.carBrand}</h1>
-                <p className="text-slate-400 text-sm mt-1">Plaka: <span className="text-white font-mono">{authForm.plate || profile.plate}</span></p>
+              <div className="flex items-center gap-4">
+                <div className="bg-emerald-500/10 p-4 rounded-2xl border border-emerald-500/20 text-emerald-400">
+                  <Car className="w-8 h-8" />
+                </div>
+                <div>
+                  <span className="bg-emerald-500/10 text-emerald-400 text-xs px-3 py-1 rounded-full font-semibold border border-emerald-500/20">Aktif Araç</span>
+                  <h1 className="text-2xl font-bold text-white mt-1">{activeCar.brand}</h1>
+                  <p className="text-slate-400 text-sm">Plaka: <span className="text-white font-mono">{activeCar.plate}</span></p>
+                </div>
               </div>
               <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 flex items-center gap-4">
                 <div className="text-right">
                   <div className="text-xs text-slate-400">Batarya Sağlığı</div>
-                  <div className="text-lg font-bold text-emerald-400">%96.5</div>
+                  <div className="text-lg font-bold text-emerald-400">%96.8</div>
                 </div>
                 <div className="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400">
                   <ShieldCheck className="w-6 h-6" />
@@ -247,7 +259,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Metrik Kartları */}
+            {/* Metrikler */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
                 <div className="text-slate-400 text-xs font-medium">Toplam Tüketim</div>
@@ -267,9 +279,8 @@ export default function App() {
               </div>
             </div>
 
-            {/* Detaylı Grafik ve Dağılımlar */}
+            {/* Detaylı Grafikler */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Şarj Tipi Dağılımı */}
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
                 <h3 className="text-base font-bold text-white mb-4">Şarj Tipi Tüketim Dağılımı</h3>
                 <div className="space-y-4">
@@ -303,9 +314,8 @@ export default function App() {
                 </div>
               </div>
 
-              {/* İstasyonlara Göre Tüketim */}
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
-                <h3 className="text-base font-bold text-white mb-4">İstasyonlar ve Ev Tüketimi</h3>
+                <h3 className="text-base font-bold text-white mb-4">İstasyonlara Göre Tüketim</h3>
                 <div className="space-y-3">
                   {Object.keys(stationTotals).length === 0 ? (
                     <p className="text-slate-500 text-sm">Henüz kayıt bulunmuyor.</p>
@@ -326,13 +336,11 @@ export default function App() {
           </div>
         )}
 
-        {/* ŞARJ EKLE / AI OKUMA */}
         {activeTab === 'add' && (
           <div className="max-w-2xl mx-auto bg-slate-900 border border-slate-800 p-8 rounded-2xl">
             <h2 className="text-xl font-bold text-white mb-2">{editingId ? 'Kayıt Düzenle' : 'Yeni Şarj Kaydı Ekle'}</h2>
-            <p className="text-slate-400 text-sm mb-6">Şarj istasyonu verilerini elle girebilir veya fotoğraf yükleyerek AI ile okutabilirsiniz.</p>
+            <p className="text-slate-400 text-sm mb-6">İstasyon verilerini elle girebilir veya fotoğraf yükleyerek AI ile anında okutabilirsiniz.</p>
 
-            {/* AI Fotoğraf Alanı */}
             {!editingId && (
               <div className="mb-6 p-6 border-2 border-dashed border-slate-700 rounded-2xl text-center bg-slate-950/40">
                 <input type="file" accept="image/*" onChange={handleImageUpload} id="ai-upload" className="hidden" />
@@ -345,6 +353,11 @@ export default function App() {
                   </span>
                   <span className="text-xs text-slate-500 mt-1">PNG, JPG veya Ekran Görüntüsü</span>
                 </label>
+                {previewImage && (
+                  <div className="mt-4">
+                    <img src={previewImage} alt="Önizleme" className="max-h-32 mx-auto rounded-lg border border-slate-700" />
+                  </div>
+                )}
               </div>
             )}
 
@@ -353,17 +366,14 @@ export default function App() {
                 <div>
                   <label className="block text-xs font-medium text-slate-400 mb-1">Tarih</label>
                   <input 
-                    type="date" 
-                    value={form.date} 
-                    onChange={e => setForm({...form, date: e.target.value})}
+                    type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})}
                     className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500" 
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-400 mb-1">Şarj Tipi</label>
                   <select 
-                    value={form.type} 
-                    onChange={e => setForm({...form, type: e.target.value})}
+                    value={form.type} onChange={e => setForm({...form, type: e.target.value})}
                     className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500"
                   >
                     <option value="Ev">Ev Şarjı</option>
@@ -376,10 +386,8 @@ export default function App() {
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1">İstasyon Adı / Lokasyon</label>
                 <input 
-                  type="text" 
-                  placeholder="Örn: Ev Tipi, ZES AVM, Trugo vb."
-                  value={form.station} 
-                  onChange={e => setForm({...form, station: e.target.value})}
+                  type="text" placeholder="Örn: Ev Tipi, ZES AVM, Trugo vb."
+                  value={form.station} onChange={e => setForm({...form, station: e.target.value})}
                   className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500" 
                 />
               </div>
@@ -388,24 +396,16 @@ export default function App() {
                 <div>
                   <label className="block text-xs font-medium text-slate-400 mb-1">Tüketim (kWh)</label>
                   <input 
-                    type="number" 
-                    step="0.1" 
-                    required
-                    placeholder="45.5"
-                    value={form.kwh} 
-                    onChange={e => setForm({...form, kwh: e.target.value})}
+                    type="number" step="0.1" required placeholder="45.5"
+                    value={form.kwh} onChange={e => setForm({...form, kwh: e.target.value})}
                     className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500" 
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-400 mb-1">Maliyet (₺)</label>
                   <input 
-                    type="number" 
-                    step="0.1" 
-                    required
-                    placeholder="250"
-                    value={form.cost} 
-                    onChange={e => setForm({...form, cost: e.target.value})}
+                    type="number" step="0.1" required placeholder="250"
+                    value={form.cost} onChange={e => setForm({...form, cost: e.target.value})}
                     className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500" 
                   />
                 </div>
@@ -418,7 +418,6 @@ export default function App() {
           </div>
         )}
 
-        {/* GEÇMİŞ KAYITLAR */}
         {activeTab === 'logs' && (
           <div className="space-y-6">
             <h2 className="text-xl font-bold text-white">Geçmiş Şarj Kayıtları</h2>
@@ -470,38 +469,62 @@ export default function App() {
           </div>
         )}
 
-        {/* PROFİL */}
         {activeTab === 'profile' && (
           <div className="max-w-xl mx-auto bg-slate-900 border border-slate-800 p-8 rounded-2xl space-y-6">
-            <h2 className="text-xl font-bold text-white">Profil ve Araç Ayarları</h2>
-            <div className="space-y-4">
+            <h2 className="text-xl font-bold text-white">Profil ve Araç Yönetimi</h2>
+            
+            <div className="space-y-4 border-b border-slate-800 pb-6">
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1">Ad Soyad</label>
                 <input 
-                  type="text" 
-                  value={authForm.name || profile.name} 
-                  onChange={e => setProfile({...profile, name: e.target.value})}
+                  type="text" value={profile.name} onChange={e => setProfile({...profile, name: e.target.value})}
                   className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500" 
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Araç Marka / Model</label>
+                <label className="block text-xs font-medium text-slate-400 mb-1">E-Posta</label>
                 <input 
-                  type="text" 
-                  value={profile.carBrand} 
-                  onChange={e => setProfile({...profile, carBrand: e.target.value})}
+                  type="email" value={profile.email} onChange={e => setProfile({...profile, email: e.target.value})}
                   className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500" 
                 />
               </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Plaka</label>
-                <input 
-                  type="text" 
-                  value={authForm.plate || profile.plate} 
-                  onChange={e => setProfile({...profile, plate: e.target.value})}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500" 
-                />
+            </div>
+
+            <div>
+              <h3 className="text-base font-bold text-white mb-3">Kayıtlı Araçlarım</h3>
+              <div className="space-y-3 mb-4">
+                {profile.cars.map(car => (
+                  <div key={car.id} className="flex items-center justify-between bg-slate-950 p-4 rounded-xl border border-slate-800">
+                    <div>
+                      <div className="font-semibold text-white">{car.brand}</div>
+                      <div className="text-xs text-slate-400">Plaka: {car.plate}</div>
+                    </div>
+                    <button 
+                      onClick={() => setActiveCarFunc(car.id)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${car.active ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                    >
+                      {car.active ? 'Aktif Araç' : 'Seç'}
+                    </button>
+                  </div>
+                ))}
               </div>
+
+              <form onSubmit={handleAddCar} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+                <h4 className="text-sm font-semibold text-white">Yeni Araç Ekle</h4>
+                <input 
+                  type="text" placeholder="Araç Marka / Model (örn: TOGG T10X)" 
+                  value={newCarBrand} onChange={e => setNewCarBrand(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                />
+                <input 
+                  type="text" placeholder="Plaka (örn: 34 ABC 34)" 
+                  value={newCarPlate} onChange={e => setNewCarPlate(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                />
+                <button type="submit" className="w-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold py-2 rounded-xl border border-emerald-500/20 text-sm transition">
+                  Aracı Listeye Ekle
+                </button>
+              </form>
             </div>
           </div>
         )}
